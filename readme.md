@@ -8,6 +8,7 @@ Il regroupe les notions des README Exercism et explique chaque commande/outil de
 - Si tu bloques sur une ligne de code, va d'abord à l'`Index rapide`.
 - Lis ensuite la section complète avec l'exemple.
 - Reviens coder, puis valide avec les tests.
+- Ordre conseillé pour débuter: sections 1 -> 10, puis 17, puis 22.
 
 ---
 
@@ -34,6 +35,11 @@ Il regroupe les notions des README Exercism et explique chaque commande/outil de
 - Documentation Go -> section 19
 - Recettes rapides copiables -> section 20
 - Pièges ultra fréquents -> section 21
+- Lecture ligne par ligne (explication guidée) -> section 22
+- Aléatoire (`math/rand`: `Intn`, `Float64`, `Shuffle`) -> section 23
+- Expressions régulières (`regexp`: `MustCompile`, `MatchString`, `Split`, `ReplaceAllString`) -> section 24
+- Fonctions d'ordre supérieur / closures (prédicats) -> section 25
+- Matrice exercice -> notions (audit) -> section 26
 
 ---
 
@@ -770,6 +776,7 @@ func DescribeAnything(i any) string {
 ## Sources couvertes
 
 - airport-robot
+- animal-magic
 - annalyns-infiltration
 - bird-watcher
 - blackjack
@@ -779,6 +786,7 @@ func DescribeAnything(i any) string {
 - census
 - chessboard
 - election-day
+- expenses
 - gross-store
 - hello-world
 - interest-is-interesting
@@ -788,12 +796,14 @@ func DescribeAnything(i any) string {
 - logs-logs-logs
 - meteorology
 - need-for-speed
+- parsing-log-files
 - party-robot
 - sorting-room
 - the-farm
 - vehicle-purchase
 - weather-forecast
 - welcome-to-tech-palace
+
 
 ---
 
@@ -1043,4 +1053,476 @@ Quand tu lis une fonction, pose-toi ces questions ligne par ligne:
 - La boucle parcourt quoi exactement (`index`, `value`, `key`, `rune`) ?
 - Où l'état change (`count++`, `append`, `field = ...`) ?
 - Le retour final correspond bien au type attendu par les tests ?
+
+
+
+### 22.11 Validation d'une ligne de log avec regex
+
+```go
+var validLineRE = regexp.MustCompile(`^\[(TRC|DBG|INF|WRN|ERR|FTL)\]`)
+
+func IsValidLine(text string) bool {
+	return validLineRE.MatchString(text)
+}
+```
+
+Explication ligne par ligne:
+- `var validLineRE = regexp.MustCompile(...)`
+  - Compile la regex une fois au chargement du package.
+  - `^` = début de ligne.
+  - `\[` et `\]` = crochets littéraux.
+  - `(TRC|DBG|...)` = une des options autorisées.
+- `func IsValidLine(text string) bool {`
+  - Fonction qui prend une ligne de log et renvoie vrai/faux.
+- `return validLineRE.MatchString(text)`
+  - Vérifie si `text` correspond au motif au début de la ligne.
+
+### 22.12 Découper une ligne avec un séparateur regex
+
+```go
+var splitLogLineRE = regexp.MustCompile(`<[~*=-]*>`)
+
+func SplitLogLine(text string) []string {
+	return splitLogLineRE.Split(text, -1)
+}
+```
+
+Explication ligne par ligne:
+- `<[~*=-]*>`
+  - Début `<`, fin `>`.
+  - Entre les deux: zéro ou plusieurs caractères parmi `~`, `*`, `=`, `-`.
+  - `*` permet aussi `<>`.
+- `Split(text, -1)`
+  - Coupe `text` partout où le séparateur est trouvé.
+  - `-1` = pas de limite sur le nombre de morceaux.
+
+### 22.13 Tag utilisateur avec capture de groupe
+
+```go
+var userNameCaptureRE = regexp.MustCompile(`User\s+([^\s]+)\s`)
+
+func TagWithUserName(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		m := userNameCaptureRE.FindStringSubmatch(line)
+		if len(m) == 2 {
+			out[i] = "[USR] " + m[1] + " " + line
+		} else {
+			out[i] = line
+		}
+	}
+	return out
+}
+```
+
+Explication ligne par ligne:
+- `User\s+`
+  - Cherche le mot `User` suivi d'un ou plusieurs espaces.
+- `([^\s]+)`
+  - Groupe capturé: le nom d'utilisateur (suite sans espaces).
+- `\s`
+  - Un espace après le nom (hypothèse du sujet).
+- `out := make([]string, len(lines))`
+  - Prépare une slice résultat de même taille.
+- `FindStringSubmatch(line)`
+  - Renvoie la correspondance complète + les groupes capturés.
+- `len(m) == 2`
+  - `m[0]` = match complet, `m[1]` = nom capturé.
+
+### 22.14 Calcul avec `rand` ligne par ligne
+
+```go
+func RollADie() int {
+	return rand.Intn(20) + 1
+}
+
+func GenerateWandEnergy() float64 {
+	return rand.Float64() * 12.0
+}
+```
+
+Explication ligne par ligne:
+- `rand.Intn(20)`
+  - Donne un entier dans `[0, 20)`.
+- `+ 1`
+  - Décale vers `[1, 20]`.
+- `rand.Float64()`
+  - Donne un float dans `[0.0, 1.0)`.
+- `* 12.0`
+  - Échelle vers `[0.0, 12.0)`.
+
+### 22.15 Closure de filtre (prédicat)
+
+```go
+func ByCategory(c string) func(Record) bool {
+	return func(r Record) bool {
+		return r.Category == c
+	}
+}
+```
+
+Explication ligne par ligne:
+- `ByCategory(c string)`
+  - Prend une catégorie cible (`c`).
+- `func(Record) bool`
+  - Retourne une fonction prédicat.
+- `return func(r Record) bool { ... }`
+  - Fonction anonyme qui "capture" `c`.
+- `r.Category == c`
+  - Vrai uniquement pour les enregistrements de la catégorie demandée.
+
+### 22.16 Erreur personnalisée pas à pas
+
+```go
+type InvalidCowsError struct {
+	cows int
+	msg  string
+}
+
+func (e *InvalidCowsError) Error() string {
+	return fmt.Sprintf("%d cows are invalid: %s", e.cows, e.msg)
+}
+```
+
+Explication ligne par ligne:
+- `type InvalidCowsError struct { ... }`
+  - Type dédié pour transporter le contexte de l'erreur.
+- `func (e *InvalidCowsError) Error() string`
+  - Implémente l'interface `error`.
+- `Sprintf(...)`
+  - Formate un message utile pour debug et tests.
+
+### 22.17 Itération map ligne par ligne
+
+```go
+func CountInRank(cb Chessboard, rank int) int {
+	if rank < 1 || rank > 8 {
+		return 0
+	}
+	count := 0
+	for _, file := range cb {
+		if len(file) >= rank && file[rank-1] {
+			count++
+		}
+	}
+	return count
+}
+```
+
+Explication ligne par ligne:
+- `if rank < 1 || rank > 8`
+  - Garde de sécurité pour éviter un index invalide.
+- `for _, file := range cb`
+  - Parcourt chaque colonne (map de `File`).
+- `file[rank-1]`
+  - Convertit un rang 1..8 en index 0..7.
+- `count++`
+  - Compte uniquement les cases occupées (`true`).
+
+---
+
+## 23. Aléatoire avec `math/rand`
+
+Notions vues dans `animal-magic`.
+
+### Fonctions principales
+- `rand.Intn(n)` -> entier aléatoire dans `[0, n)`.
+- `rand.Float64()` -> float aléatoire dans `[0.0, 1.0)`.
+- `rand.Shuffle(n, swapFn)` -> mélange des éléments en place.
+
+### Exemples
+```go
+// 1..20 inclus
+roll := rand.Intn(20) + 1
+
+// 0.0 <= e < 12.0
+energy := rand.Float64() * 12.0
+
+animals := []string{"ant", "beaver", "cat", "dog", "eel", "fox", "goat", "hedgehog"}
+rand.Shuffle(len(animals), func(i, j int) {
+	animals[i], animals[j] = animals[j], animals[i]
+})
+```
+
+### Pièges fréquents
+- Oublier que `Intn(20)` commence à 0 (pas 1).
+- Oublier que `Float64()` ne prend pas d'argument.
+- Oublier de retourner la slice après `Shuffle`.
+
+---
+
+## 24. Expressions régulières (`regexp`)
+
+Notions vues dans `parsing-log-files`.
+
+### Pourquoi compiler une regex
+- `regexp.MustCompile(...)` compile une fois et réutilise le motif.
+- À placer en variable package si utilisé souvent.
+
+### Méthodes courantes
+- `re.MatchString(s)` -> booléen (correspondance oui/non)
+- `re.Split(s, -1)` -> découpe la chaîne selon le séparateur regex
+- `re.ReplaceAllString(s, repl)` -> remplace toutes les occurrences
+- `re.FindStringSubmatch(s)` -> récupère la capture complète + groupes
+
+### Exemples
+```go
+validLineRE := regexp.MustCompile(`^\[(TRC|DBG|INF|WRN|ERR|FTL)\]`)
+valid := validLineRE.MatchString("[INF] System ready")
+
+sepRE := regexp.MustCompile(`<[~*=-]*>`)
+parts := sepRE.Split("section 1<*>section 2<>section 3", -1)
+
+eolRE := regexp.MustCompile(`end-of-line\d+`)
+clean := eolRE.ReplaceAllString("[INF] end-of-line23033 ok", "")
+
+userRE := regexp.MustCompile(`User\s+([^\s]+)\s`)
+m := userRE.FindStringSubmatch("[WRN] User James123 lost connection.")
+// m[1] == "James123"
+```
+
+### Pièges fréquents
+- `+` veut dire 1 ou plus; pour accepter `<>`, il faut `*` (0 ou plus).
+- Oublier l'ancre `^` quand on veut "commence par".
+- Compter des occurrences avec `MatchString` alors qu'on veut toutes les occurrences (utiliser `FindAll...`).
+
+---
+
+## 25. Fonctions d'ordre supérieur et closures (prédicats)
+
+Notions vues dans `expenses`.
+
+### Idée
+Une fonction peut:
+- être passée en argument,
+- être renvoyée par une autre fonction,
+- capturer des variables (closure).
+
+### Exemple de filtre générique
+```go
+func Filter(in []Record, predicate func(Record) bool) []Record {
+	out := []Record{}
+	for _, r := range in {
+		if predicate(r) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+```
+
+### Closure par période
+```go
+func ByDaysPeriod(p DaysPeriod) func(Record) bool {
+	return func(r Record) bool {
+		return r.Day >= p.From && r.Day <= p.To
+	}
+}
+```
+
+### Closure par catégorie
+```go
+func ByCategory(c string) func(Record) bool {
+	return func(r Record) bool {
+		return r.Category == c
+	}
+}
+```
+
+### Composition utile
+```go
+inPeriod := Filter(records, ByDaysPeriod(period))
+inCategory := Filter(inPeriod, ByCategory("food"))
+```
+
+### Pièges fréquents
+- Retourner un bool au lieu de retourner une fonction.
+- Oublier que la closure capture les variables extérieures.
+- Multiplier les boucles quand un `Filter` composable suffit.
+
+
+---
+
+## 26. Matrice exercice -> notions (audit)
+
+Cette matrice est extraite automatiquement des README de chaque dossier.
+Elle sert de checklist pour retrouver rapidement où une notion a été vue.
+
+- `airport-robot`: Interface comme ensemble de méthodes; Implémenter une interface; Vidéo de l'interface
+- `animal-magic`: Graines
+- `annalyns-infiltration`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `bird-watcher`: Syntaxe générale; Boucles For - Un exemple
+- `blackjack`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `booking-up-for-beauty`: Options de mise en page
+- `card-tricks`: Tranches (Tranches); Fonctions Variadiques
+- `cars-assemble`: Numéros; Opérateurs arithmétiques; Conversion entre les types; Opérations arithmétiques sur différents types
+- `census`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `chessboard`: Itérer sur une slice; Itérer sur une map; Itération en omettant la clé ou la valeur; Types non structurés
+- `election-day`: Variables et mémoire; Pointeurs; Obtenir un pointeur vers une variable; Accéder à la valeur via un pointeur (déréférencement); Pointeurs vers des structures; Les tranches et les cartes sont déjà des pointeurs
+- `expenses`: Types de fonction; Fonctions anonymes
+- `gross-store`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `hello-world`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `interest-is-interesting`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `jedliks-toys`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+- `lasagna`: Forfaits; Variables; Constantes; Fonctions
+- `lasagna-master`: Paramètres de fonction; Paramètres vs. Arguments; Valeurs de retour; Appel de fonctions; Valeurs de retour nommées et retour nu; Passage par valeur vs. passage par référence; Pointeurs; Exceptions
+- `logs-logs-logs`: Unicode et points de code Unicode; UTF-8; Utilisation des Runes; Runes et Chaînes
+- `meteorology`: Exemple : Distances
+- `need-for-speed`: Définir une struct; Créer des instances d'une struct; Fonctions "Nouveau"
+- `parsing-log-files`: Syntaxe; Compilation des modèles - type `RegExp`; Méthodes d'expression régulière; Exemples de `MatchString`; Exemples de `FindString`; Exemples de `FindStringSubmatch`; Exemples de `ReplaceAllString`; Exemples de `Split`
+- `party-robot`: Forfaits; Formatage des Chaînes
+- `sorting-room`: Conversion de types; Conversion entre types primitifs et chaînes de caractères; Assertions de type; Commutateurs de Type
+- `the-farm`: L'interface d'erreur; Créer et renvoyer une erreur simple; Vérification des erreurs; Types d'erreurs personnalisés
+- `vehicle-purchase`: Comparaison; Si les déclarations
+- `weather-forecast`: Commentaires de documentation; Commentaires de paquet; Commentaires de fonction
+- `welcome-to-tech-palace`: (pas de sous-section de notion explicite entre Introduction et Instructions)
+
+---
+
+## 27. Lecture caractère par caractère (niveau débutant absolu)
+
+Objectif: comprendre exactement ce que chaque symbole fait dans une ligne Go.
+
+### 27.1 Regex de validation de log, symbole par symbole
+
+```go
+var validLineRE = regexp.MustCompile(`^\[(TRC|DBG|INF|WRN|ERR|FTL)\]`)
+```
+
+Décomposition:
+- `var`
+  - Déclare une variable.
+- `validLineRE`
+  - Nom de la variable (ici une regex compilée).
+- `=`
+  - Affectation.
+- `regexp.MustCompile(...)`
+  - Compile la regex tout de suite.
+  - `MustCompile` panique si la regex est invalide.
+- Les backticks `` `...` ``
+  - Chaîne brute (pratique pour regex: moins d'échappements Go).
+- `^`
+  - Début de chaîne.
+- `\[` et `\]`
+  - Crochets littéraux `[` et `]`.
+- `(A|B|C)`
+  - Groupe: une option parmi plusieurs.
+- `TRC|DBG|INF|WRN|ERR|FTL`
+  - Niveaux de logs autorisés.
+
+```go
+func IsValidLine(text string) bool {
+	return validLineRE.MatchString(text)
+}
+```
+
+Décomposition:
+- `func`
+  - Déclare une fonction.
+- `IsValidLine`
+  - Nom de la fonction.
+- `(text string)`
+  - Un paramètre nommé `text` de type `string`.
+- `bool`
+  - Type de retour.
+- `return`
+  - Renvoie le résultat.
+- `MatchString(text)`
+  - Teste si `text` matche la regex.
+
+### 27.2 Closure de filtre, symbole par symbole
+
+```go
+func ByCategory(c string) func(Record) bool {
+	return func(r Record) bool {
+		return r.Category == c
+	}
+}
+```
+
+Décomposition:
+- `func ByCategory(c string)`
+  - Fonction qui reçoit une catégorie cible `c`.
+- `func(Record) bool`
+  - Type de retour: "une fonction qui prend `Record` et renvoie `bool`".
+- `return func(r Record) bool { ... }`
+  - Retourne une fonction anonyme.
+- `r.Category == c`
+  - Compare la catégorie du record à la valeur capturée `c`.
+- Capture (closure)
+  - La fonction interne "se souvient" de `c` même après la fin de `ByCategory`.
+
+### 27.3 Suppression dans une slice avec `append`, symbole par symbole
+
+```go
+return append(s[:index], s[index+1:]...)
+```
+
+Décomposition:
+- `s[:index]`
+  - Prend les éléments avant `index`.
+- `s[index+1:]`
+  - Prend les éléments après `index`.
+- `...`
+  - "Déplie" la 2e slice en arguments variadiques pour `append`.
+- `append(a, b...)`
+  - Concatène `a` et `b`.
+- Résultat
+  - Même slice sans l'élément d'index `index`.
+
+Version complète avec garde:
+
+```go
+func RemoveItem(s []int, index int) []int {
+	if index < 0 || index >= len(s) {
+		return s
+	}
+	return append(s[:index], s[index+1:]...)
+}
+```
+
+Décomposition de la garde:
+- `index < 0`
+  - Évite un index négatif.
+- `index >= len(s)`
+  - Évite un dépassement de slice.
+- `||`
+  - OU logique: si une des deux conditions est vraie, index invalide.
+
+### 27.4 Lecture d'une signature de fonction (anti-panique)
+
+Exemple:
+
+```go
+func CategoryExpenses(in []Record, p DaysPeriod, c string) (float64, error)
+```
+
+Comment lire:
+- Nom: `CategoryExpenses`
+- Entrées:
+  - `in` -> `[]Record`
+  - `p` -> `DaysPeriod`
+  - `c` -> `string`
+- Sorties:
+  - `float64` (valeur utile)
+  - `error` (erreur éventuelle)
+
+Règle pratique:
+- Si tu vois `(X, error)`, pense immédiatement:
+  - "je dois gérer `err != nil` côté appelant".
+
+### 27.5 Mini-glossaire des symboles (ultra rapide)
+
+- `:=` -> déclare + assigne (dans une fonction)
+- `=` -> assigne une variable existante
+- `==` -> compare l'égalité
+- `!=` -> compare la différence
+- `&&` -> ET logique
+- `||` -> OU logique
+- `[]T` -> slice de type `T`
+- `map[K]V` -> map clé `K`, valeur `V`
+- `*T` -> pointeur vers `T`
+- `&x` -> adresse de `x`
+- `...` -> arguments variadiques / dépliage de slice
+- `_` -> ignore volontairement une valeur
 
